@@ -11,6 +11,8 @@ interface User {
     avatar?: string;
 }
 
+import { MOCK_USERS } from '../data/mockData';
+
 interface AuthContextType {
     user: User | null;
     token: string | null;
@@ -38,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const verifyToken = async (token: string) => {
         try {
-            const response = await fetch('http://localhost:3002/api/auth/verify', {
+            const response = await fetch('/api/auth/verify', {
                 headers: {
                     'Authorization': `Bearer ${token}`
                 }
@@ -52,14 +54,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 localStorage.removeItem('ecobite_token');
             }
         } catch (error) {
-            console.error('Token verification failed:', error);
-            localStorage.removeItem('ecobite_token');
+            console.warn('Token verification failed (Offline Mode):', error);
+            // In offline mode, we can't verify the token, but we can keep the session if we had a user.
+            // For now, let's just clear it to be safe, or maybe we can persist user in localStorage too.
+            // Let's try to restore user from localStorage if available
+            const savedUser = localStorage.getItem('ecobite_user');
+            if (savedUser) {
+                setUser(JSON.parse(savedUser));
+                setToken(token);
+            } else {
+                localStorage.removeItem('ecobite_token');
+            }
         }
     };
 
     const register = async (data: any) => {
         try {
-            const response = await fetch('http://localhost:3002/api/auth/register', {
+            const response = await fetch('/api/auth/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
@@ -74,11 +85,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(result.user);
             setToken(result.token);
             localStorage.setItem('ecobite_token', result.token);
+            localStorage.setItem('ecobite_user', JSON.stringify(result.user));
             navigate('/mobile', { replace: true });
         } catch (error: any) {
             console.error('Registration error:', error);
-            if (error.message === 'Failed to fetch') {
-                throw new Error('Cannot connect to server. Please make sure the backend is running on port 3002.');
+            if (error.message === 'Failed to fetch' || error.message.includes('NetworkError')) {
+                console.log('Falling back to Mock Registration');
+                const newUser: User = {
+                    id: `u${Date.now()}`,
+                    email: data.email,
+                    name: data.name,
+                    role: data.role || 'individual',
+                    organization: data.organization,
+                    ecoPoints: 0
+                };
+                setUser(newUser);
+                setToken('mock-token');
+                localStorage.setItem('ecobite_token', 'mock-token');
+                localStorage.setItem('ecobite_user', JSON.stringify(newUser));
+                navigate('/mobile', { replace: true });
+                alert('⚠️ Running in Demo Mode (Backend unreachable)');
+                return;
             }
             throw new Error(error.message || 'Registration failed');
         }
@@ -86,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const login = async (email: string, password: string) => {
         try {
-            const response = await fetch('http://localhost:3002/api/auth/login', {
+            const response = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
@@ -101,11 +128,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(result.user);
             setToken(result.token);
             localStorage.setItem('ecobite_token', result.token);
+            localStorage.setItem('ecobite_user', JSON.stringify(result.user));
             navigate('/mobile', { replace: true });
         } catch (error: any) {
             console.error('Login error:', error);
-            if (error.message === 'Failed to fetch') {
-                throw new Error('Cannot connect to server. Please make sure the backend is running on port 3002.');
+            if (error.message === 'Failed to fetch' || error.message.includes('NetworkError')) {
+                console.log('Falling back to Mock Login');
+                const mockUser = MOCK_USERS.find(u => u.email === email);
+                if (mockUser) {
+                    const userObj: User = {
+                        id: mockUser.id,
+                        email: mockUser.email,
+                        name: mockUser.name,
+                        role: mockUser.type, // Map 'type' to 'role'
+                        organization: mockUser.organization,
+                        ecoPoints: mockUser.ecoPoints
+                    };
+                    setUser(userObj);
+                    setToken('mock-token');
+                    localStorage.setItem('ecobite_token', 'mock-token');
+                    localStorage.setItem('ecobite_user', JSON.stringify(userObj));
+                    navigate('/mobile', { replace: true });
+                    alert('⚠️ Running in Demo Mode (Backend unreachable)');
+                    return;
+                } else {
+                    throw new Error('Invalid credentials (Demo Mode)');
+                }
             }
             throw new Error(error.message || 'Login failed');
         }
@@ -115,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setToken(null);
         localStorage.removeItem('ecobite_token');
+        localStorage.removeItem('ecobite_user');
         navigate('/welcome');
     };
 
