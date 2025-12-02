@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MOCK_USERS } from '../data/mockData';
 
 interface User {
     id: string;
@@ -57,15 +56,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 localStorage.removeItem('ecobite_token');
             }
         } catch (error) {
-            console.warn('Token verification failed (Offline Mode):', error);
-            // In offline mode, try to restore user from localStorage if available
-            const savedUser = localStorage.getItem('ecobite_user');
-            if (savedUser) {
-                setUser(JSON.parse(savedUser));
-                setToken(token);
-            } else {
-                localStorage.removeItem('ecobite_token');
-            }
+            console.warn('Token verification failed:', error);
+            localStorage.removeItem('ecobite_token');
         } finally {
             setLoading(false);
         }
@@ -80,16 +72,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             if (!response.ok) {
-                // If backend is missing (404) or erroring (5xx), treat as offline/demo mode
-                if (response.status === 404 || response.status >= 500) {
-                    throw new Error('Backend unreachable');
-                }
-
                 let error;
                 try {
                     error = await response.json();
                 } catch (e) {
-                    throw new Error('Backend unreachable');
+                    // If response is not JSON (e.g. 404/500 HTML), throw generic error
+                    throw new Error(`Registration failed: ${response.status} ${response.statusText}`);
                 }
                 throw new Error(error.error || 'Registration failed');
             }
@@ -98,27 +86,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(result.user);
             setToken(result.token);
             localStorage.setItem('ecobite_token', result.token);
-            localStorage.setItem('ecobite_user', JSON.stringify(result.user));
             navigate('/mobile', { replace: true });
         } catch (error: any) {
             console.error('Registration error:', error);
-            if (error.message === 'Failed to fetch' || error.message.includes('NetworkError') || error.message === 'Backend unreachable' || error.message.includes('Unexpected token')) {
-                console.log('Falling back to Mock Registration');
-                const newUser: User = {
-                    id: `u${Date.now()}`,
-                    email: data.email,
-                    name: data.name,
-                    role: data.role || 'individual',
-                    organization: data.organization,
-                    ecoPoints: 0
-                };
-                setUser(newUser);
-                setToken('mock-token');
-                localStorage.setItem('ecobite_token', 'mock-token');
-                localStorage.setItem('ecobite_user', JSON.stringify(newUser));
-                navigate('/mobile', { replace: true });
-                return;
-            }
             throw new Error(error.message || 'Registration failed');
         }
     };
@@ -132,16 +102,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             if (!response.ok) {
-                // If backend is missing (404) or erroring (5xx), treat as offline/demo mode
-                if (response.status === 404 || response.status >= 500) {
-                    throw new Error('Backend unreachable');
-                }
-
                 let error;
                 try {
                     error = await response.json();
                 } catch (e) {
-                    throw new Error('Backend unreachable');
+                    throw new Error(`Login failed: ${response.status} ${response.statusText}`);
                 }
                 throw new Error(error.error || 'Login failed');
             }
@@ -150,32 +115,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(result.user);
             setToken(result.token);
             localStorage.setItem('ecobite_token', result.token);
-            localStorage.setItem('ecobite_user', JSON.stringify(result.user));
             navigate('/mobile', { replace: true });
         } catch (error: any) {
             console.error('Login error:', error);
-            if (error.message === 'Failed to fetch' || error.message.includes('NetworkError') || error.message === 'Backend unreachable' || error.message.includes('Unexpected token')) {
-                console.log('Falling back to Mock Login');
-                const mockUser = MOCK_USERS.find(u => u.email === email);
-                if (mockUser) {
-                    const userObj: User = {
-                        id: mockUser.id,
-                        email: mockUser.email,
-                        name: mockUser.name,
-                        role: mockUser.type, // Map 'type' to 'role'
-                        organization: mockUser.organization,
-                        ecoPoints: mockUser.ecoPoints
-                    };
-                    setUser(userObj);
-                    setToken('mock-token');
-                    localStorage.setItem('ecobite_token', 'mock-token');
-                    localStorage.setItem('ecobite_user', JSON.stringify(userObj));
-                    navigate('/mobile', { replace: true });
-                    return;
-                } else {
-                    throw new Error('Invalid credentials (Demo Mode)');
-                }
-            }
             throw new Error(error.message || 'Login failed');
         }
     };
@@ -184,7 +126,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
         setToken(null);
         localStorage.removeItem('ecobite_token');
-        localStorage.removeItem('ecobite_user');
         navigate('/welcome');
     };
 
