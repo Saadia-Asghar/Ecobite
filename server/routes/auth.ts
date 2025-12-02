@@ -65,12 +65,18 @@ router.post('/login', async (req, res) => {
         }
         const user = await db.get('SELECT * FROM users WHERE email = ?', email);
 
+        console.log('Login attempt for:', email);
+        console.log('User found:', user ? 'YES' : 'NO');
+
         if (!user) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
         // Compare password
+        console.log('Comparing password...');
         const isValid = await bcrypt.compare(password, user.password);
+        console.log('Password valid:', isValid);
+
         if (!isValid) {
             return res.status(401).json({ error: 'Invalid credentials' });
         }

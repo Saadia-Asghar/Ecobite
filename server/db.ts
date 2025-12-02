@@ -284,9 +284,15 @@ export async function initDB() {
     const adminEmail = 'admin@ecobite.com';
     const existingAdmin = await db.get('SELECT * FROM users WHERE email = ?', [adminEmail]);
 
+    console.log('Checking for existing admin...');
+    console.log('Existing admin:', existingAdmin ? 'FOUND' : 'NOT FOUND');
+
     if (!existingAdmin) {
       const hashedPassword = await bcrypt.hash('Admin@123', 10);
       const adminId = 'admin-' + Date.now();
+      console.log('Creating admin user with ID:', adminId);
+      console.log('Hashed password length:', hashedPassword.length);
+
       // params: [id, email, password, name, type, organization, licenseId, location, ecoPoints]
       await db.run(
         'INSERT INTO users (id, email, password, name, type, organization, licenseId, location, ecoPoints) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -295,6 +301,16 @@ export async function initDB() {
       console.log('✅ Admin user created:');
       console.log('   Email: admin@ecobite.com');
       console.log('   Password: Admin@123');
+
+      // Verify it was created
+      const verifyAdmin = await db.get('SELECT * FROM users WHERE email = ?', [adminEmail]);
+      console.log('Verification - Admin exists:', verifyAdmin ? 'YES' : 'NO');
+      if (verifyAdmin) {
+        console.log('   Admin ID:', verifyAdmin.id);
+        console.log('   Admin Type:', verifyAdmin.type);
+      }
+    } else {
+      console.log('Admin user already exists, skipping creation');
     }
 
     console.log('Database initialized');
