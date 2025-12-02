@@ -72,12 +72,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             if (!response.ok) {
+                const text = await response.text();
                 let error;
                 try {
-                    error = await response.json();
+                    error = JSON.parse(text);
                 } catch (e) {
                     // If response is not JSON (e.g. 404/500 HTML), throw generic error with text
-                    const text = await response.text();
                     throw new Error(`Registration failed: ${response.status} ${response.statusText} - ${text.substring(0, 100)}`);
                 }
                 throw new Error(error.error || 'Registration failed');
