@@ -6,8 +6,9 @@ import bcrypt from 'bcryptjs';
 let db: any;
 
 export async function initDB() {
-  const dbPath = process.env.VERCEL ? '/tmp/ecobite.db' : './ecobite.db';
-  console.log(`Initializing database at ${dbPath}`);
+  const isVercel = process.env.VERCEL || process.env.NODE_ENV === 'production';
+  const dbPath = isVercel ? '/tmp/ecobite.db' : './ecobite.db';
+  console.log(`Initializing database at ${dbPath} (Vercel: ${isVercel})`);
 
   db = await open({
     filename: dbPath,
@@ -136,7 +137,7 @@ export async function initDB() {
   const userCount = await db.get('SELECT count(*) as count FROM users');
   if (userCount.count === 0) {
     console.log('Seeding mock users...');
-    const mockUsers = [
+    let mockUsers = [
       { id: 'u1', name: 'Ali Khan', email: 'ali@example.com', type: 'individual', ecoPoints: 1250, location: 'Islamabad', joinedAt: '2024-01-15' },
       { id: 'u2', name: 'Spice Bazaar', email: 'contact@spicebazaar.pk', type: 'restaurant', organization: 'Spice Bazaar', ecoPoints: 3500, location: 'Lahore', joinedAt: '2024-02-01' },
       { id: 'u3', name: 'Edhi Foundation', email: 'info@edhi.org', type: 'ngo', organization: 'Edhi', ecoPoints: 5000, location: 'Karachi', joinedAt: '2023-12-10' },
@@ -147,8 +148,17 @@ export async function initDB() {
       { id: 'admin1', name: 'System Admin', email: 'admin@ecobite.pk', type: 'admin', ecoPoints: 0, location: 'HQ', joinedAt: '2023-11-01' },
     ];
 
+    // In production/Vercel, only seed essential users to save startup time
+    if (isVercel) {
+      mockUsers = [
+        { id: 'u1', name: 'Ali Khan', email: 'ali@example.com', type: 'individual', ecoPoints: 1250, location: 'Islamabad', joinedAt: '2024-01-15' },
+        { id: 'admin1', name: 'System Admin', email: 'admin@ecobite.pk', type: 'admin', ecoPoints: 0, location: 'HQ', joinedAt: '2023-11-01' }
+      ];
+    }
+
     for (const u of mockUsers) {
-      const hashedPassword = await bcrypt.hash('User@123', 10);
+      // Use 1 salt round for speed in production/seeding
+      const hashedPassword = await bcrypt.hash('User@123', 1);
       await db.run(
         `INSERT INTO users (id, email, password, name, type, organization, ecoPoints, location, createdAt)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,

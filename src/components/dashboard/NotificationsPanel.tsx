@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, CheckCircle, Info, AlertTriangle, X } from 'lucide-react';
+import { Bell, CheckCircle, Info, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MOCK_NOTIFICATIONS, Notification } from '../../data/mockData';
 import { useAuth } from '../../context/AuthContext';
@@ -122,9 +122,9 @@ export default function NotificationsPanel() {
                                             >
                                                 <div className="flex gap-3">
                                                     <div className={`mt-1 flex-shrink-0 p-2 rounded-full ${notification.type === 'success' ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
-                                                            notification.type === 'warning' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' :
-                                                                notification.type === 'alert' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
-                                                                    'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                                                        notification.type === 'warning' ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' :
+                                                            notification.type === 'alert' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
+                                                                'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
                                                         }`}>
                                                         {getIcon(notification.type)}
                                                     </div>

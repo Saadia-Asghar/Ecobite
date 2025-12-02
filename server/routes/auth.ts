@@ -39,9 +39,9 @@ router.post('/register', validateUser, async (req, res) => {
             token,
             user: { id, email, name, role, organization, location, ecoPoints: 0 }
         });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Registration error:', error);
-        res.status(500).json({ error: 'Failed to register user' });
+        res.status(500).json({ error: 'Failed to register user', details: error.message });
     }
 });
 
@@ -169,7 +169,7 @@ router.delete('/users/:id', async (req, res) => {
         // Delete user
         await db.run('DELETE FROM users WHERE id = ?', id);
 
-         res.json({ message: 'User deleted successfully' });
+        res.json({ message: 'User deleted successfully' });
     } catch (error) {
         console.error('Delete user error:', error);
         res.status(500).json({ error: 'Failed to delete user' });
