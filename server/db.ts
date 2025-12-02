@@ -17,7 +17,7 @@ class MockDatabase {
     admin_logs: []
   };
 
-  async exec(sql: string) {
+  async exec(_sql: string) {
     // Basic parsing to create tables (noop in mock)
     return;
   }
@@ -61,7 +61,7 @@ class MockDatabase {
     return undefined;
   }
 
-  async all(sql: string, params: any[] = []) {
+  async all(_sql: string, _params: any[] = []) {
     return [];
   }
 }
