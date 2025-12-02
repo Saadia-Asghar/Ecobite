@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"vite\"",
-    "build": "tsc && vite build",
+    "build": "tsc -p tsconfig.app.json && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "server": "npx tsx watch server/index.ts",
@@ -34,8 +34,6 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.3",
     "recharts": "^2.12.2",
-    "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.7",
     "tailwind-merge": "^2.2.1",
     "uuid": "^9.0.1"
   },
