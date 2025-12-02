@@ -49,7 +49,7 @@ export default function NotificationsPanel() {
     };
 
     return (
-        <div className="relative z-50">
+        <div className="relative z-[9999]">
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className="relative p-2 rounded-full hover:bg-forest-100 dark:hover:bg-forest-700 transition-colors"
@@ -66,14 +66,14 @@ export default function NotificationsPanel() {
                 {isOpen && (
                     <>
                         <div
-                            className="fixed inset-0 z-40 bg-black/10 backdrop-blur-[1px]"
+                            className="fixed inset-0 z-[9998] bg-black/10 backdrop-blur-[1px]"
                             onClick={() => setIsOpen(false)}
                         />
                         <motion.div
                             initial={{ opacity: 0, y: 10, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            className="absolute right-0 mt-2 w-[85vw] sm:w-96 max-w-[400px] bg-white dark:bg-forest-800 rounded-2xl shadow-2xl border border-forest-100 dark:border-forest-700 z-50 overflow-hidden origin-top-right"
+                            className="absolute right-0 mt-2 w-[85vw] sm:w-96 max-w-[400px] bg-white dark:bg-forest-800 rounded-2xl shadow-2xl border border-forest-100 dark:border-forest-700 z-[9999] overflow-hidden origin-top-right"
                         >
                             <div className="p-4 border-b border-forest-100 dark:border-forest-700 flex items-center justify-between bg-forest-50 dark:bg-forest-900/50">
                                 <h3 className="font-bold text-forest-900 dark:text-ivory flex items-center gap-2">

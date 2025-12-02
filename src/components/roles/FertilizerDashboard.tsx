@@ -7,23 +7,29 @@ interface FertilizerDashboardProps {
 
 import { useAuth } from '../../context/AuthContext';
 import ClaimedDonationsList from '../dashboard/ClaimedDonationsList';
+import NotificationsPanel from '../dashboard/NotificationsPanel';
 
 export default function FertilizerDashboard({ onNavigate }: FertilizerDashboardProps = {}) {
     const { user } = useAuth();
     return (
         <div className="space-y-6">
             {/* Company Header */}
-            <div className="bg-gradient-to-r from-green-600 to-green-700 p-6 rounded-3xl text-white">
-                <div className="flex items-center gap-3 mb-2">
-                    <Recycle className="w-8 h-8" />
-                    <div>
-                        <h1 className="text-2xl font-bold">{user?.organization || user?.name || 'Waste Management'}</h1>
-                        <p className="text-green-100 text-sm">Waste Management Partner</p>
+            <div className="bg-gradient-to-r from-green-600 to-green-700 p-6 rounded-3xl text-white shadow-lg flex justify-between items-start">
+                <div>
+                    <div className="flex items-center gap-3 mb-2">
+                        <Recycle className="w-8 h-8" />
+                        <div>
+                            <h1 className="text-2xl font-bold">{user?.organization || user?.name || 'Waste Management'}</h1>
+                            <p className="text-green-100 text-sm">Waste Management Partner</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-3 text-sm">
+                        <Leaf className="w-4 h-4" />
+                        <span>Converting waste to resources</span>
                     </div>
                 </div>
-                <div className="flex items-center gap-2 mt-3 text-sm">
-                    <Leaf className="w-4 h-4" />
-                    <span>Converting waste to resources</span>
+                <div className="bg-white/20 rounded-full p-1 backdrop-blur-sm">
+                    <NotificationsPanel />
                 </div>
             </div>
 

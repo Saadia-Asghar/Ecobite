@@ -18,6 +18,7 @@ import {
     MOCK_LOGS, MOCK_BALANCE, MOCK_FINANCIAL_SUMMARY,
     User, Voucher
 } from '../../data/mockData';
+import NotificationsPanel from '../dashboard/NotificationsPanel';
 
 export default function AdminDashboard() {
     const { logout } = useAuth();
@@ -316,7 +317,10 @@ export default function AdminDashboard() {
                                 <p className="text-sm text-forest-300">Complete System Management</p>
                             </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 items-center">
+                            <div className="bg-white/20 rounded-full p-1 backdrop-blur-sm">
+                                <NotificationsPanel />
+                            </div>
                             <button onClick={toggleTheme} className="p-2 hover:bg-forest-800 rounded-xl">{theme === 'dark' ? '☀️' : '🌙'}</button>
                             <button onClick={logout} className="flex items-center gap-2 px-4 py-2 bg-red-500/20 rounded-xl"><LogOut className="w-4 h-4" />Logout</button>
                         </div>
