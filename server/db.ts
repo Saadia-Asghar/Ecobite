@@ -28,39 +28,99 @@ class MockDatabase {
     if (lowerSql.includes('insert into')) {
       const tableNameMatch = lowerSql.match(/insert into (\w+)/);
       if (tableNameMatch && this.data[tableNameMatch[1]]) {
-        console.log('MockDB INSERT:', tableNameMatch[1]);
+        const table = tableNameMatch[1];
+        console.log('MockDB INSERT:', table);
 
-        // Try to reconstruct object for users (most critical)
-        if (tableNameMatch[1] === 'users') {
+        if (table === 'users') {
           // params: [id, email, password, name, type, organization, ecoPoints, location, createdAt]
           this.data.users.push({
             id: params[0], email: params[1], password: params[2], name: params[3],
             type: params[4], organization: params[5], ecoPoints: params[6],
             location: params[7], createdAt: params[8]
           });
+        } else if (table === 'donations') {
+          // params: [id, donorId, status, expiry, aiFoodType, aiQualityScore, imageUrl, description, quantity, lat, lng]
+          this.data.donations.push({
+            id: params[0], donorId: params[1], status: params[2], expiry: params[3],
+            aiFoodType: params[4], aiQualityScore: params[5], imageUrl: params[6],
+            description: params[7], quantity: params[8], lat: params[9], lng: params[10],
+            senderConfirmed: 0, receiverConfirmed: 0, createdAt: new Date().toISOString()
+          });
+        } else if (table === 'food_requests') {
+          // params: [id, requesterId, foodType, quantity, aiDrafts]
+          this.data.food_requests.push({
+            id: params[0], requesterId: params[1], foodType: params[2], quantity: params[3],
+            aiDrafts: params[4], createdAt: new Date().toISOString()
+          });
+        } else if (table === 'financial_transactions') {
+          // params: [id, userId, type, amount, category, description, createdAt]
+          this.data.financial_transactions.push({
+            id: params[0], userId: params[1], type: params[2], amount: params[3],
+            category: params[4], description: params[5], createdAt: params[6]
+          });
         }
       }
+    } else if (lowerSql.includes('update')) {
+      // Basic UPDATE support for common operations
+      if (lowerSql.includes('donations') && lowerSql.includes('set status =')) {
+        // Extract ID (assuming it's the last param)
+        const id = params[params.length - 1];
+        const donation = this.data.donations.find(d => d.id === id);
+        if (donation) {
+          // This is very specific to the app's update logic, might need generalization
+          // For now, just logging updates in mock mode is often enough if we don't need perfect state
+          // But for "features should work", we try to update status
+          if (lowerSql.includes('claimedbyid')) {
+            donation.status = params[0];
+            donation.claimedById = params[1];
+          } else if (lowerSql.includes('senderconfirmed')) {
+            donation.senderConfirmed = 1;
+          } else if (lowerSql.includes('receiverconfirmed')) {
+            donation.receiverConfirmed = 1;
+          } else if (lowerSql.includes('status = ? where id')) {
+            donation.status = params[0];
+          }
+        }
+      }
+    } else if (lowerSql.includes('delete from')) {
+      if (lowerSql.includes('donations')) {
+        const id = params[0];
+        this.data.donations = this.data.donations.filter(d => d.id !== id);
+      }
     }
+
     return { lastID: 0, changes: 1 };
   }
 
   async get(sql: string, params: any[] = []) {
     const lowerSql = sql.toLowerCase();
-    if (lowerSql.includes('select') && lowerSql.includes('from users')) {
-      if (lowerSql.includes('where email = ?')) {
-        return this.data.users.find(u => u.email === params[0]);
+    if (lowerSql.includes('select')) {
+      if (lowerSql.includes('from users')) {
+        if (lowerSql.includes('where email = ?')) return this.data.users.find(u => u.email === params[0]);
+        if (lowerSql.includes('where id = ?')) return this.data.users.find(u => u.id === params[0]);
+        if (lowerSql.includes('count(*)')) return { count: this.data.users.length };
       }
-      if (lowerSql.includes('where id = ?')) {
-        return this.data.users.find(u => u.id === params[0]);
+      if (lowerSql.includes('from donations')) {
+        if (lowerSql.includes('where id = ?')) return this.data.donations.find(d => d.id === params[0]);
       }
-      if (lowerSql.includes('count(*)')) {
-        return { count: this.data.users.length };
+      if (lowerSql.includes('from fund_balance')) {
+        return this.data.fund_balance[0];
       }
     }
     return undefined;
   }
 
-  async all(_sql: string, _params: any[] = []) {
+  async all(sql: string, params: any[] = []) {
+    const lowerSql = sql.toLowerCase();
+    if (lowerSql.includes('select') && lowerSql.includes('from donations')) {
+      let results = [...this.data.donations];
+      // Basic filtering mock
+      if (lowerSql.includes('status = ?')) {
+        const status = params[0]; // Simplified param mapping
+        results = results.filter(d => d.status === status);
+      }
+      return results;
+    }
     return [];
   }
 }
@@ -203,46 +263,14 @@ export async function initDB() {
       await db.run('INSERT INTO fund_balance (id, totalBalance, totalDonations, totalWithdrawals) VALUES (1, 0, 0, 0)');
     }
 
-    // Seed Users
-    const userCount = await db.get('SELECT count(*) as count FROM users');
-    if (userCount && userCount.count === 0) {
-      console.log('Seeding mock users...');
-      let mockUsers = [
-        { id: 'u1', name: 'Ali Khan', email: 'ali@example.com', type: 'individual', ecoPoints: 1250, location: 'Islamabad', joinedAt: '2024-01-15' },
-        { id: 'u2', name: 'Spice Bazaar', email: 'contact@spicebazaar.pk', type: 'restaurant', organization: 'Spice Bazaar', ecoPoints: 3500, location: 'Lahore', joinedAt: '2024-02-01' },
-        { id: 'u3', name: 'Edhi Foundation', email: 'info@edhi.org', type: 'ngo', organization: 'Edhi', ecoPoints: 5000, location: 'Karachi', joinedAt: '2023-12-10' },
-        { id: 'u4', name: 'Sara Ahmed', email: 'sara@example.com', type: 'individual', ecoPoints: 450, location: 'Rawalpindi', joinedAt: '2024-03-20' },
-        { id: 'u5', name: 'Burger Lab', email: 'manager@burgerlab.pk', type: 'restaurant', organization: 'Burger Lab', ecoPoints: 2100, location: 'Islamabad', joinedAt: '2024-01-05' },
-        { id: 'u6', name: 'Fatima Jinnah', email: 'fatima@example.com', type: 'individual', ecoPoints: 800, location: 'Karachi', joinedAt: '2024-04-12' },
-        { id: 'u7', name: 'Save Food NGO', email: 'help@savefood.org', type: 'ngo', organization: 'Save Food', ecoPoints: 1500, location: 'Lahore', joinedAt: '2024-02-28' },
-        { id: 'admin1', name: 'System Admin', email: 'admin@ecobite.pk', type: 'admin', ecoPoints: 0, location: 'HQ', joinedAt: '2023-11-01' },
-      ];
-
-      // In production/Vercel, only seed essential users
-      if (isVercel) {
-        mockUsers = [
-          { id: 'u1', name: 'Ali Khan', email: 'ali@example.com', type: 'individual', ecoPoints: 1250, location: 'Islamabad', joinedAt: '2024-01-15' },
-          { id: 'admin1', name: 'System Admin', email: 'admin@ecobite.pk', type: 'admin', ecoPoints: 0, location: 'HQ', joinedAt: '2023-11-01' }
-        ];
-      }
-
-      for (const u of mockUsers) {
-        const hashedPassword = await bcrypt.hash('User@123', 1);
-        await db.run(
-          `INSERT INTO users (id, email, password, name, type, organization, ecoPoints, location, createdAt)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [u.id, u.email, hashedPassword, u.name, u.type, u.organization || '', u.ecoPoints, u.location || '', u.joinedAt]
-        );
-      }
-      console.log(`Seeded ${mockUsers.length} mock users`);
-    }
+    // NO SEEDING - User requested clean state
+    console.log('Database initialized (No seeding)');
   } catch (error) {
     console.error('Database initialization error:', error);
     // If even the mock DB fails (unlikely), we re-throw
     throw error;
   }
 
-  console.log('Database initialized');
   return db;
 }
 
