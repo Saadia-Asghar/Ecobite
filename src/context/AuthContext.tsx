@@ -90,6 +90,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             navigate('/mobile', { replace: true });
         } catch (error: any) {
             console.error('Registration error:', error);
+            // Check if it's a network error (backend not running)
+            if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+                throw new Error('Cannot connect to server. Please make sure the backend is running.');
+            }
             throw new Error(error.message || 'Registration failed');
         }
     };
