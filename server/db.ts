@@ -280,7 +280,7 @@ export async function initDB() {
     }
 
     // Seed Admin User (if not exists)
-    const bcrypt = await import('bcryptjs');
+    const bcrypt = (await import('bcryptjs')).default;
     const adminEmail = 'admin@ecobite.com';
     const existingAdmin = await db.get('SELECT * FROM users WHERE email = ?', [adminEmail]);
 
