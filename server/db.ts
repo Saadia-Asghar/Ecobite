@@ -1,5 +1,3 @@
-import bcrypt from 'bcryptjs';
-
 // Initialize DB
 let db: any;
 
@@ -34,14 +32,14 @@ class MockDatabase {
         if (table === 'users') {
           // params from auth.ts: [id, email, password, name, type, organization, licenseId, location, ecoPoints]
           this.data.users.push({
-            id: params[0], 
-            email: params[1], 
-            password: params[2], 
+            id: params[0],
+            email: params[1],
+            password: params[2],
             name: params[3],
-            type: params[4], 
-            organization: params[5] || null, 
+            type: params[4],
+            organization: params[5] || null,
             licenseId: params[6] || null,
-            location: params[7] || null, 
+            location: params[7] || null,
             ecoPoints: params[8] || 0,
             createdAt: new Date().toISOString()
           });
@@ -109,7 +107,7 @@ class MockDatabase {
         } else if (lowerSql.includes('where id = ?')) {
           user = this.data.users.find(u => u.id === params[0]);
         }
-        
+
         if (user) {
           // Return user with all fields, ensuring licenseId is included
           return {
@@ -281,8 +279,24 @@ export async function initDB() {
       await db.run('INSERT INTO fund_balance (id, totalBalance, totalDonations, totalWithdrawals) VALUES (1, 0, 0, 0)');
     }
 
-    // NO SEEDING - User requested clean state
-    console.log('Database initialized (No seeding)');
+    // Seed Admin User (if not exists)
+    const bcrypt = await import('bcryptjs');
+    const adminEmail = 'admin@ecobite.com';
+    const existingAdmin = await db.get('SELECT * FROM users WHERE email = ?', [adminEmail]);
+
+    if (!existingAdmin) {
+      const hashedPassword = await bcrypt.hash('Admin@123', 10);
+      const adminId = 'admin-' + Date.now();
+      await db.run(
+        'INSERT INTO users (id, email, password, name, type, organization, ecoPoints, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [adminId, adminEmail, hashedPassword, 'Admin User', 'admin', 'EcoBite Admin', 5000, new Date().toISOString()]
+      );
+      console.log('✅ Admin user created:');
+      console.log('   Email: admin@ecobite.com');
+      console.log('   Password: Admin@123');
+    }
+
+    console.log('Database initialized');
   } catch (error) {
     console.error('Database initialization error:', error);
     // If even the mock DB fails (unlikely), we re-throw
