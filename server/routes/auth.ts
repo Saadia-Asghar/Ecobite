@@ -190,4 +190,41 @@ router.delete('/users/:id', async (req, res) => {
     }
 });
 
+// Test endpoint to verify admin user
+router.get('/test-admin', async (req, res) => {
+    try {
+        const db = getDB();
+        const admin = await db.get('SELECT * FROM users WHERE email = ?', ['admin@ecobite.com']);
+
+        if (!admin) {
+            return res.json({
+                exists: false,
+                message: 'Admin user not found in database'
+            });
+        }
+
+        // Test password comparison
+        const testPassword = 'Admin@123';
+        const isValid = await bcrypt.compare(testPassword, admin.password);
+
+        res.json({
+            exists: true,
+            admin: {
+                id: admin.id,
+                email: admin.email,
+                name: admin.name,
+                type: admin.type,
+                hashedPasswordLength: admin.password?.length || 0
+            },
+            passwordTest: {
+                testPassword: testPassword,
+                isValid: isValid,
+                message: isValid ? 'Password matches!' : 'Password does NOT match'
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Test failed', details: (error as any).message });
+    }
+});
+
 export default router;
