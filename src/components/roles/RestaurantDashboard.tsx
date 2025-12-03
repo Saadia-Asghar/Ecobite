@@ -103,7 +103,7 @@ export default function RestaurantDashboard({ onNavigate }: RestaurantDashboardP
                         <span className="font-bold">Top Contributor</span>
                     </div>
                 </div>
-                <div className="bg-white/20 rounded-full p-1 backdrop-blur-sm">
+                <div className="bg-white/20 rounded-full p-1 relative z-[100]">
                     <NotificationsPanel />
                 </div>
             </div>

@@ -44,7 +44,7 @@ export default function IndividualDashboard({ onNavigate }: IndividualDashboardP
                     <h1 className="text-2xl font-bold mb-2">Welcome Back, {user?.name || 'User'}! 👋</h1>
                     <p className="text-green-100">Individual Donor</p>
                 </div>
-                <div className="bg-white/20 rounded-full p-1 backdrop-blur-sm">
+                <div className="bg-white/20 rounded-full p-1 relative z-[100]">
                     <NotificationsPanel />
                 </div>
             </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Package, LogOut, Award, Download, Trash2, DollarSign, Plus, Pause, Play } from 'lucide-react';
+import { Users, Package, LogOut, Award, Download, Trash2, DollarSign, Plus, Pause, Play, Eye, X, Pencil, FileText, MapPin } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart as RePieChart, Pie, Cell } from 'recharts';
@@ -12,6 +12,11 @@ import {
     exportEcoPointsToPDF,
     exportCompleteReportToPDF
 } from '../../utils/pdfExport';
+import {
+    exportUsersToCSV,
+    exportDonationsToCSV,
+    exportVouchersToCSV
+} from '../../utils/csvExport';
 
 import {
     MOCK_USERS, MOCK_VOUCHERS, MOCK_DONATIONS, MOCK_TRANSACTIONS,
@@ -25,6 +30,8 @@ export default function AdminDashboard() {
     const { theme, toggleTheme } = useTheme();
     const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'donations' | 'vouchers' | 'finance' | 'analytics' | 'logs' | 'ecopoints'>('overview');
     const [loading, setLoading] = useState(true);
+    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const [showUserDetails, setShowUserDetails] = useState(false);
 
     // Data states
     const [stats, setStats] = useState({ users: 0, donations: 0, points: 0, completed: 0 });
@@ -48,6 +55,7 @@ export default function AdminDashboard() {
 
     // Voucher form
     const [showVoucherForm, setShowVoucherForm] = useState(false);
+    const [editingVoucherId, setEditingVoucherId] = useState<string | null>(null);
     const [voucherForm, setVoucherForm] = useState({
         code: '', title: '', description: '', discountType: 'percentage',
         discountValue: 0, minEcoPoints: 0, maxRedemptions: 100, expiryDate: ''
@@ -167,12 +175,12 @@ export default function AdminDashboard() {
     const fetchVoucherRedemptions = async (voucherId: string) => {
         try {
             const res = await fetch(`http://localhost:3002/api/vouchers/${voucherId}/performance`);
-            if (res.ok) {
-                const data = await res.json();
-                setVoucherRedemptions(data.redemptions);
-                setSelectedVoucher(data.voucher);
-                setShowRedemptions(true);
-            }
+            if (!res.ok) throw new Error('Failed to fetch redemptions');
+
+            const data = await res.json();
+            setVoucherRedemptions(data.redemptions);
+            setSelectedVoucher(data.voucher);
+            setShowRedemptions(true);
         } catch (error) {
             // Mock redemptions
             setVoucherRedemptions([
@@ -203,55 +211,129 @@ export default function AdminDashboard() {
         }
     };
 
-    const createVoucher = async () => {
+    const deleteVoucher = async (voucherId: string, voucherTitle: string) => {
+        if (!confirm(`Delete voucher "${voucherTitle}"? This cannot be undone.`)) return;
         try {
-            const res = await fetch('http://localhost:3002/api/vouchers', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(voucherForm)
-            });
+            const res = await fetch(`http://localhost:3002/api/vouchers/${voucherId}`, { method: 'DELETE' });
             if (res.ok) {
-                const data = await res.json();
-                await logAction('CREATE_VOUCHER', data.id, `Created voucher: ${voucherForm.title}`);
+                await logAction('DELETE_VOUCHER', voucherId, `Deleted voucher: ${voucherTitle}`);
                 await fetchAllData();
-                setShowVoucherForm(false);
-                setVoucherForm({ code: '', title: '', description: '', discountType: 'percentage', discountValue: 0, minEcoPoints: 0, maxRedemptions: 100, expiryDate: '' });
-                alert('✅ Voucher created!');
+                alert('✅ Voucher deleted!');
             } else {
                 throw new Error('Failed');
             }
         } catch (error) {
-            // Mock create
-            const newVoucher: Voucher = {
-                id: `v${Date.now()}`,
-                ...voucherForm,
-                currentRedemptions: 0,
-                status: 'active',
-                createdAt: new Date().toISOString(),
-                discountType: voucherForm.discountType as 'percentage' | 'fixed',
-                expiryDate: voucherForm.expiryDate || new Date(Date.now() + 86400000 * 30).toISOString()
-            };
-            setVouchers(prev => [newVoucher, ...prev]);
-            await logAction('CREATE_VOUCHER', newVoucher.id, `Created voucher: ${voucherForm.title} (Mock)`);
-            setShowVoucherForm(false);
-            setVoucherForm({ code: '', title: '', description: '', discountType: 'percentage', discountValue: 0, minEcoPoints: 0, maxRedemptions: 100, expiryDate: '' });
-            alert('✅ Voucher created (Mock)!');
+            // Mock delete
+            setVouchers(prev => prev.filter(v => v.id !== voucherId));
+            await logAction('DELETE_VOUCHER', voucherId, `Deleted voucher: ${voucherTitle} (Mock)`);
+            alert('✅ Voucher deleted (Mock)!');
+        }
+    };
+
+    const handleEditVoucher = (voucher: Voucher) => {
+        setEditingVoucherId(voucher.id);
+        setVoucherForm({
+            code: voucher.code,
+            title: voucher.title,
+            description: voucher.description || '',
+            discountType: voucher.discountType,
+            discountValue: voucher.discountValue,
+            minEcoPoints: voucher.minEcoPoints,
+            maxRedemptions: voucher.maxRedemptions,
+            expiryDate: voucher.expiryDate.split('T')[0]
+        });
+        setShowVoucherForm(true);
+    };
+
+    const handleSaveVoucher = async () => {
+        if (editingVoucherId) {
+            // Update existing voucher
+            try {
+                const res = await fetch(`http://localhost:3002/api/vouchers/${editingVoucherId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(voucherForm)
+                });
+
+                if (!res.ok) throw new Error('Failed to update');
+
+                await logAction('UPDATE_VOUCHER', editingVoucherId, `Updated voucher: ${voucherForm.title}`);
+                await fetchAllData();
+                setShowVoucherForm(false);
+                setEditingVoucherId(null);
+                setVoucherForm({ code: '', title: '', description: '', discountType: 'percentage', discountValue: 0, minEcoPoints: 0, maxRedemptions: 100, expiryDate: '' });
+                alert('✅ Voucher updated!');
+            } catch (error) {
+                // Mock update
+                setVouchers(prev => prev.map(v => v.id === editingVoucherId ? { ...v, ...voucherForm, discountType: voucherForm.discountType as 'percentage' | 'fixed' } : v));
+                await logAction('UPDATE_VOUCHER', editingVoucherId, `Updated voucher: ${voucherForm.title} (Mock)`);
+                setShowVoucherForm(false);
+                setEditingVoucherId(null);
+                setVoucherForm({ code: '', title: '', description: '', discountType: 'percentage', discountValue: 0, minEcoPoints: 0, maxRedemptions: 100, expiryDate: '' });
+                alert('✅ Voucher updated (Mock)!');
+            }
+        } else {
+            // Create new voucher
+            try {
+                const res = await fetch('http://localhost:3002/api/vouchers', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(voucherForm)
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    await logAction('CREATE_VOUCHER', data.id, `Created voucher: ${voucherForm.title}`);
+                    await fetchAllData();
+                    setShowVoucherForm(false);
+                    setVoucherForm({ code: '', title: '', description: '', discountType: 'percentage', discountValue: 0, minEcoPoints: 0, maxRedemptions: 100, expiryDate: '' });
+                    alert('✅ Voucher created!');
+                } else {
+                    throw new Error('Failed');
+                }
+            } catch (error) {
+                // Mock create
+                const newVoucher: Voucher = {
+                    id: `v${Date.now()}`,
+                    ...voucherForm,
+                    currentRedemptions: 0,
+                    status: 'active',
+                    createdAt: new Date().toISOString(),
+                    discountType: voucherForm.discountType as 'percentage' | 'fixed',
+                    expiryDate: voucherForm.expiryDate || new Date(Date.now() + 86400000 * 30).toISOString()
+                };
+                setVouchers(prev => [newVoucher, ...prev]);
+                await logAction('CREATE_VOUCHER', newVoucher.id, `Created voucher: ${voucherForm.title} (Mock)`);
+                setShowVoucherForm(false);
+                setVoucherForm({ code: '', title: '', description: '', discountType: 'percentage', discountValue: 0, minEcoPoints: 0, maxRedemptions: 100, expiryDate: '' });
+                alert('✅ Voucher created (Mock)!');
+            }
         }
     };
 
     const toggleVoucherStatus = async (id: string, currentStatus: string) => {
         const newStatus = currentStatus === 'active' ? 'paused' : 'active';
+
+        // Optimistic update
+        setVouchers(prev => prev.map(v => v.id === id ? { ...v, status: newStatus as any } : v));
+
         try {
-            await fetch(`http://localhost:3002/api/vouchers/${id}/status`, {
+            const res = await fetch(`http://localhost:3002/api/vouchers/${id}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: newStatus })
             });
+
+            if (!res.ok) {
+                // If failed, but we want to keep the optimistic update for mock/demo purposes if backend is down
+                // throw new Error('Failed to update status');
+                console.warn('Backend update failed, keeping local state');
+            }
+
             await logAction('UPDATE_VOUCHER', id, `Changed status to: ${newStatus}`);
-            await fetchAllData();
         } catch (error) {
-            // Mock update
-            setVouchers(prev => prev.map(v => v.id === id ? { ...v, status: newStatus as any } : v));
+            console.error('Update failed', error);
+            // If we wanted to revert on error, we would do it here. 
+            // But since we want to support "mock" mode when backend is down, we keep the change.
             await logAction('UPDATE_VOUCHER', id, `Changed status to: ${newStatus} (Mock)`);
         }
     };
@@ -318,7 +400,7 @@ export default function AdminDashboard() {
                             </div>
                         </div>
                         <div className="flex gap-2 items-center">
-                            <div className="bg-white/20 rounded-full p-1 backdrop-blur-sm">
+                            <div className="bg-white/20 rounded-full p-1 relative z-[100]">
                                 <NotificationsPanel />
                             </div>
                             <button onClick={toggleTheme} className="p-2 hover:bg-forest-800 rounded-xl">{theme === 'dark' ? '☀️' : '🌙'}</button>
@@ -519,6 +601,17 @@ export default function AdminDashboard() {
                                 >
                                     <Download className="w-4 h-4" />PDF
                                 </button>
+                                <button
+                                    onClick={() => exportUsersToCSV(
+                                        users.filter(u =>
+                                            (roleFilter === 'all' || u.type === roleFilter) &&
+                                            (u.name.toLowerCase().includes(userFilter.toLowerCase()) || u.email.toLowerCase().includes(userFilter.toLowerCase()))
+                                        )
+                                    )}
+                                    className="px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-xl text-sm font-bold hover:bg-green-200 dark:hover:bg-green-900/40 transition-all flex items-center gap-2"
+                                >
+                                    <FileText className="w-4 h-4" />CSV
+                                </button>
                             </div>
                         </div>
                         <div className="overflow-x-auto">
@@ -528,6 +621,7 @@ export default function AdminDashboard() {
                                         <th className="p-3 text-left text-sm font-bold">Name</th>
                                         <th className="p-3 text-left text-sm font-bold">Email</th>
                                         <th className="p-3 text-left text-sm font-bold">Role</th>
+                                        <th className="p-3 text-left text-sm font-bold">Location</th>
                                         <th className="p-3 text-left text-sm font-bold">Points</th>
                                         <th className="p-3 text-left text-sm font-bold">Actions</th>
                                     </tr>
@@ -541,11 +635,39 @@ export default function AdminDashboard() {
                                             <td className="p-3 text-forest-900 dark:text-ivory">{user.name}</td>
                                             <td className="p-3 text-forest-600 dark:text-forest-300 text-sm">{user.email}</td>
                                             <td className="p-3"><span className="px-2 py-1 bg-forest-100 dark:bg-forest-700 rounded text-xs font-bold capitalize">{user.type}</span></td>
+                                            <td className="p-3 text-forest-600 dark:text-forest-300 text-sm">
+                                                <div className="flex flex-col">
+                                                    <span className="font-medium">{user.location || 'N/A'}</span>
+                                                    {user.address && (
+                                                        <a
+                                                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(user.address)}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-1"
+                                                        >
+                                                            <MapPin className="w-3 h-3" />
+                                                            {user.address}
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            </td>
                                             <td className="p-3 font-bold">{user.ecoPoints}</td>
                                             <td className="p-3">
-                                                <button onClick={() => deleteUser(user.id, user.name)} className="p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg">
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedUser(user);
+                                                            setShowUserDetails(true);
+                                                        }}
+                                                        className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-lg hover:bg-blue-200 transition-colors"
+                                                        title="View Details"
+                                                    >
+                                                        <Eye className="w-4 h-4" />
+                                                    </button>
+                                                    <button onClick={() => deleteUser(user.id, user.name)} className="p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -580,6 +702,14 @@ export default function AdminDashboard() {
                                     className="px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-xl text-sm font-bold hover:bg-red-200 dark:hover:bg-red-900/40 transition-all flex items-center gap-2"
                                 >
                                     <Download className="w-4 h-4" />PDF
+                                </button>
+                                <button
+                                    onClick={() => exportDonationsToCSV(
+                                        donations.filter(d => donationFilter === 'all' || d.status === donationFilter)
+                                    )}
+                                    className="px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-xl text-sm font-bold hover:bg-green-200 dark:hover:bg-green-900/40 transition-all flex items-center gap-2"
+                                >
+                                    <FileText className="w-4 h-4" />CSV
                                 </button>
                             </div>
                         </div>
@@ -631,7 +761,11 @@ export default function AdminDashboard() {
                 {activeTab === 'vouchers' && (
                     <div className="space-y-4">
                         <div className="flex justify-between items-center">
-                            <button onClick={() => setShowVoucherForm(!showVoucherForm)} className="px-6 py-3 bg-forest-900 dark:bg-mint text-ivory dark:text-forest-900 rounded-xl font-bold flex items-center gap-2">
+                            <button onClick={() => {
+                                setShowVoucherForm(!showVoucherForm);
+                                setEditingVoucherId(null);
+                                setVoucherForm({ code: '', title: '', description: '', discountType: 'percentage', discountValue: 0, minEcoPoints: 0, maxRedemptions: 100, expiryDate: '' });
+                            }} className="px-6 py-3 bg-forest-900 dark:bg-mint text-ivory dark:text-forest-900 rounded-xl font-bold flex items-center gap-2">
                                 <Plus className="w-5 h-5" />Create Voucher
                             </button>
                             <div className="flex gap-2 items-center">
@@ -649,12 +783,20 @@ export default function AdminDashboard() {
                                 >
                                     <Download className="w-4 h-4" />PDF
                                 </button>
+                                <button
+                                    onClick={() => exportVouchersToCSV(
+                                        vouchers.filter(v => voucherFilter === 'all' || v.status === voucherFilter)
+                                    )}
+                                    className="px-4 py-3 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-xl font-bold hover:bg-green-200 dark:hover:bg-green-900/40 transition-all flex items-center gap-2"
+                                >
+                                    <FileText className="w-4 h-4" />CSV
+                                </button>
                             </div>
                         </div>
 
                         {showVoucherForm && (
                             <div className="bg-white dark:bg-forest-800 p-6 rounded-2xl border border-forest-100 dark:border-forest-700">
-                                <h3 className="text-lg font-bold mb-4">New Voucher</h3>
+                                <h3 className="text-lg font-bold mb-4">{editingVoucherId ? 'Edit Voucher' : 'New Voucher'}</h3>
                                 <div className="grid md:grid-cols-2 gap-4">
                                     <input placeholder="Code" value={voucherForm.code} onChange={e => setVoucherForm({ ...voucherForm, code: e.target.value })} className="px-4 py-2 rounded-xl bg-forest-50 dark:bg-forest-700 border-0" />
                                     <input placeholder="Title" value={voucherForm.title} onChange={e => setVoucherForm({ ...voucherForm, title: e.target.value })} className="px-4 py-2 rounded-xl bg-forest-50 dark:bg-forest-700 border-0" />
@@ -663,7 +805,12 @@ export default function AdminDashboard() {
                                     <input placeholder="Max Redemptions" type="number" value={voucherForm.maxRedemptions} onChange={e => setVoucherForm({ ...voucherForm, maxRedemptions: Number(e.target.value) })} className="px-4 py-2 rounded-xl bg-forest-50 dark:bg-forest-700 border-0" />
                                     <input type="date" value={voucherForm.expiryDate} onChange={e => setVoucherForm({ ...voucherForm, expiryDate: e.target.value })} className="px-4 py-2 rounded-xl bg-forest-50 dark:bg-forest-700 border-0" />
                                 </div>
-                                <button onClick={createVoucher} className="mt-4 px-6 py-2 bg-green-600 text-white rounded-xl font-bold">Create</button>
+                                <div className="flex gap-2 mt-4">
+                                    <button onClick={handleSaveVoucher} className="px-6 py-2 bg-green-600 text-white rounded-xl font-bold">
+                                        {editingVoucherId ? 'Update' : 'Create'}
+                                    </button>
+                                    <button onClick={() => setShowVoucherForm(false)} className="px-6 py-2 bg-gray-500 text-white rounded-xl font-bold">Cancel</button>
+                                </div>
                             </div>
                         )}
 
@@ -679,8 +826,32 @@ export default function AdminDashboard() {
                                             <button onClick={() => fetchVoucherRedemptions(v.id)} className="p-2 bg-blue-100 text-blue-700 rounded-lg">
                                                 <Users className="w-4 h-4" />
                                             </button>
-                                            <button onClick={() => toggleVoucherStatus(v.id, v.status)} className={`p-2 rounded-lg ${v.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                                            <button
+                                                onClick={() => handleEditVoucher(v)}
+                                                className="p-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors"
+                                                title="Edit Voucher"
+                                            >
+                                                <Pencil className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleVoucherStatus(v.id, v.status);
+                                                }}
+                                                className={`p-2 rounded-lg ${v.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}
+                                                title={v.status === 'active' ? 'Pause Voucher' : 'Activate Voucher'}
+                                            >
                                                 {v.status === 'active' ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deleteVoucher(v.id, v.title);
+                                                }}
+                                                className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                                                title="Delete Voucher"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
                                             </button>
                                         </div>
                                     </div>
@@ -1096,7 +1267,65 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                 )}
-            </div >
-        </div >
+
+                {/* User Details Modal */}
+                {showUserDetails && selectedUser && (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                        <div className="bg-white dark:bg-forest-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                            <div className="p-4 border-b border-forest-100 dark:border-forest-700 flex justify-between items-center bg-forest-50 dark:bg-forest-900/50">
+                                <h3 className="font-bold text-lg text-forest-900 dark:text-ivory">User Profile</h3>
+                                <button onClick={() => setShowUserDetails(false)} className="p-1 hover:bg-forest-200 dark:hover:bg-forest-700 rounded-full transition-colors">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-20 h-20 rounded-full bg-forest-100 dark:bg-forest-700 flex items-center justify-center text-3xl font-bold text-forest-500">
+                                        {selectedUser.name.charAt(0)}
+                                    </div>
+                                    <div>
+                                        <h4 className="text-xl font-bold text-forest-900 dark:text-ivory">{selectedUser.name}</h4>
+                                        <p className="text-forest-600 dark:text-forest-400">{selectedUser.email}</p>
+                                        <span className="inline-block mt-1 px-2 py-0.5 bg-mint/20 text-forest-800 text-xs font-bold rounded-full capitalize">
+                                            {selectedUser.type}
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4 py-4 border-t border-b border-forest-100 dark:border-forest-700">
+                                    <div>
+                                        <p className="text-xs text-forest-500 uppercase font-bold">Location</p>
+                                        <p className="font-medium text-forest-900 dark:text-ivory">{selectedUser.location || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-forest-500 uppercase font-bold">Joined</p>
+                                        <p className="font-medium text-forest-900 dark:text-ivory">{new Date(selectedUser.joinedAt).toLocaleDateString()}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-forest-500 uppercase font-bold">Organization</p>
+                                        <p className="font-medium text-forest-900 dark:text-ivory">{selectedUser.organization || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs text-forest-500 uppercase font-bold">User ID</p>
+                                        <p className="font-medium text-xs truncate text-forest-900 dark:text-ivory" title={selectedUser.id}>{selectedUser.id}</p>
+                                    </div>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-forest-500 uppercase font-bold mb-2">Eco Impact</p>
+                                    <div className="bg-forest-50 dark:bg-forest-900/30 p-3 rounded-xl flex items-center justify-between">
+                                        <span className="font-medium text-forest-900 dark:text-ivory">Total EcoPoints</span>
+                                        <span className="text-xl font-bold text-mint">{selectedUser.ecoPoints}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-4 border-t border-forest-100 dark:border-forest-700 flex justify-end">
+                                <button onClick={() => setShowUserDetails(false)} className="px-4 py-2 bg-forest-100 dark:bg-forest-700 hover:bg-forest-200 dark:hover:bg-forest-600 rounded-xl font-bold transition-colors text-forest-900 dark:text-ivory">
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
     );
 }
