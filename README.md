@@ -204,8 +204,9 @@ This project is licensed under the MIT License.
 
 For issues and questions:
 - Open an issue on GitHub
-- Contact: support@ecobite.org
+- Contact: saadianigah@gmail.com
 
 ---
 
-**Built with ❤️ for a sustainable future**
+
+
