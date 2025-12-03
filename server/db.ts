@@ -101,11 +101,17 @@ class MockDatabase {
     const lowerSql = sql.toLowerCase();
     if (lowerSql.includes('select')) {
       if (lowerSql.includes('from users')) {
+        console.log('[MockDB GET] Looking for user with params:', params);
+        console.log('[MockDB GET] Total users in database:', this.data.users.length);
+        console.log('[MockDB GET] User emails:', this.data.users.map(u => u.email));
+
         let user;
         if (lowerSql.includes('where email = ?')) {
           user = this.data.users.find(u => u.email === params[0]);
+          console.log('[MockDB GET] Search by email:', params[0], '→', user ? 'FOUND' : 'NOT FOUND');
         } else if (lowerSql.includes('where id = ?')) {
           user = this.data.users.find(u => u.id === params[0]);
+          console.log('[MockDB GET] Search by ID:', params[0], '→', user ? 'FOUND' : 'NOT FOUND');
         }
 
         if (user) {
