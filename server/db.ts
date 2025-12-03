@@ -1,5 +1,6 @@
 // Initialize DB
 let db: any;
+let dbInstanceId = 0;
 
 // Simple in-memory mock database for fallback
 class MockDatabase {
@@ -168,7 +169,14 @@ export async function initDB() {
   // This eliminates any risk of native module crashes (sqlite3) in serverless environments.
   // Data will be in-memory and lost on restart, but the app will be stable.
   console.log('Using In-Memory MockDatabase for stability.');
-  db = new MockDatabase();
+
+  if (!db) {
+    dbInstanceId++;
+    console.log(`[DB] Creating NEW MockDatabase instance #${dbInstanceId}`);
+    db = new MockDatabase();
+  } else {
+    console.log(`[DB] Reusing existing MockDatabase instance #${dbInstanceId}`);
+  }
 
 
 
@@ -338,6 +346,7 @@ export async function initDB() {
 }
 
 export function getDB() {
+  console.log(`[DB] getDB() called - returning instance #${dbInstanceId}, exists: ${!!db}`);
   if (!db) {
     throw new Error('Database not initialized');
   }
