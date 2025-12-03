@@ -196,7 +196,7 @@ router.delete('/users/:id', async (req, res) => {
 });
 
 // Test endpoint to verify admin user
-router.get('/test-admin', async (req, res) => {
+router.get('/test-admin', async (_req, res) => {
     try {
         const db = getDB();
         const admin = await db.get('SELECT * FROM users WHERE email = ?', ['admin@ecobite.com']);

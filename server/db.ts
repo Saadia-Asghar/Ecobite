@@ -308,9 +308,17 @@ export async function initDB() {
       if (verifyAdmin) {
         console.log('   Admin ID:', verifyAdmin.id);
         console.log('   Admin Type:', verifyAdmin.type);
+        console.log('   Stored password hash:', verifyAdmin.password?.substring(0, 20) + '...');
+
+        // Test password with stored hash
+        const storedTest = await bcrypt.compare('Admin@123', verifyAdmin.password);
+        console.log('   Password test with stored hash:', storedTest ? '✅ PASS' : '❌ FAIL');
       }
     } else {
       console.log('Admin user already exists, skipping creation');
+      // Test existing admin password
+      const testExisting = await bcrypt.compare('Admin@123', existingAdmin.password);
+      console.log('Existing admin password test:', testExisting ? '✅ PASS' : '❌ FAIL');
     }
 
     console.log('Database initialized');
